@@ -24,7 +24,7 @@ void add( state_8080* state, uint8_t value )
 {
 	// do the math with 16 bit precision so that we can
 	// capture the carry.
-      	uint16_t result = (uint16_t) state->a + (uint16_t) state->b;
+      	uint16_t result = (uint16_t) state->a + (uint16_t) value;
 
 	//if the result is zero set the zero flag to zero;
        	state->cc.z = result & 0xff == 0;
@@ -99,9 +99,32 @@ int emulate_8080( state_8080* state )
 	{
 		state->c = opcode[1];
 		state->b = opcode[2];
-		state->pc +=2;
+		state->pc +=3;
 	}
 		break;
+	case 0x11:
+	{
+		printf("LXI D, D16\n");
+		state->d = opcode[2];
+		state->e = opcode[1];
+		state->pc +=3;
+	}
+	break;
+	case 0x21:
+	{
+		printf("LXI H,D16\n");
+		state->h = opcode[2];
+		state->l = opcode[1];
+		state->pc += 3;
+	}
+	break;
+	case 0x31:
+	{
+		printf("LXI SP\n");
+		//LXI SP
+		state->sp = ( ( uint16_t ) opcode[2] << 8 ) + (uint16_t)opcode[1];
+		state->pc +=3;
+	}
 	case 0x0f:
 	{
 		// RRC, rotate right through carry
@@ -110,6 +133,12 @@ int emulate_8080( state_8080* state )
 		state->cc.cy = ( 1 == ( x & 1 ) );
 	}
 		break;
+	case 0x1a:
+	{
+		printf("LDAX D\n");
+		
+	}
+	break;
 	case 0x1f:
 	{
 		// RAR, rotate accumalator right through carry
@@ -118,20 +147,55 @@ int emulate_8080( state_8080* state )
 		state->cc.cy = ( 1 == ( x & 1 ) );
 	}
 		break;
+	case 0x24:
+	{
+		printf("INR H\n");
+		//INR H
+		//increment h
+		uint16_t result = (uint16_t)state->h + 1;
+
+		//if the result is zero set the zero flag to zero;
+		state->cc.z = result & 0xff == 0;
+
+		//set the sign flag if the 7th bit is set
+		state->cc.s = result & 0x80;
+
+		//set the carry flag if more then 8 bits are set
+		state->cc.cy = result > 0xff;
+
+		//change back to 8 bit result as we are done reading
+		//flags
+		uint8_t result8 = result = 0xff;
+
+		//set the parity flag
+		state->cc.p = parity( result8 );
+	       
+		state->h = result8;
+		state->pc++;
+	}
+	break;
 	case 0x2f:
 		state->a = ~state->a;
 		break;
 	case 0x41:
 		// MOV B,C
 		state->b = state->c;
+		state->pc++;
 		break;
 	case 0x42:
 		//MOV B,D
 		state->b = state->d;
+		state->pc++;
 		break;
 	case 0x43:
 		//MOV B,E
 		state->b = state->e;
+		state->pc++;
+		break;
+	case 0x6:
+		printf("MOV H,B\n");
+		state->h = state->b;
+		state->pc++;
 		break;
 	case 0x80:
 		//ADD B
@@ -185,6 +249,7 @@ int emulate_8080( state_8080* state )
 		break;
 	case 0xcd:
 	{
+		printf("CALL\n");
 		//CALL
 		uint16_t ret = state->pc + 2;
 		state->memory[ state->sp -1 ] = (ret >> 8) & 0xff;
